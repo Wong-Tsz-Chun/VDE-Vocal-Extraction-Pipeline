@@ -41,8 +41,6 @@ Standard separation models prioritize "listening quality" (stereo width, psychoa
 
 ## Default Pipeline Architecture
 
-The pipeline uses a "Frankenstein" crossover approach to maximize stability and clarity:
-
 ```
 1. Pre-Process:      HPF 100Hz (Remove rumble)
 2. Hybrid Separation:
