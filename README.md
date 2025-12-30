@@ -2,15 +2,22 @@
 
 **Source-Fidelity Vocal Extraction Pipeline for DiffSVC/RVC Training**
 
-A Python-based audio processing pipeline designed to prepare "dry" and "clean" vocal datasets for AI training.
+VDE is a specialized Python audio processing pipeline designed to prepare "dry" and "clean" vocal datasets for AI voice model training.
 
-## The Problem
+---
 
-Standard separation models prioritize "listening quality" (stereo width, air, smoothing) over "data purity." This introduces high-frequency noise and reverb that degrade downstream model training.
+## The Engineering Gap
 
-## The Solution
+Standard separation models prioritize "listening quality" (stereo width, psychoacoustic air, smoothing) over "data purity." While pleasing to the human ear, these features introduce artifacts—such as high-frequency hallucination and reverb tails—that degrade downstream model training (Diff-SVC, RVC).
 
-VDE chains multiple models (RoFormer, MDX-Net, De-Reverb) to aggressively isolate the vocal core. It prioritizes artifact reduction and transient stability over psychoacoustic enhancement.
+### Technical Challenges vs. VDE Solutions
+
+| Limitation | Affected Models | The VDE Solution |
+|------------|----------------|------------------|
+| **Spectral Hallucination** | Demucs v4, AudioSR | **Source Fidelity**: Standard models often generate artificial noise above the source cutoff (>16kHz) to mimic "air." VDE strictly respects source bandwidth to prevent models from learning "metallic" noise. |
+| **Volume Pumping** | Mel-Band RoFormer | **Multi-Band Hybrid**: RoFormers can suffer from amplitude fluctuation. VDE chains Mel-Band (for body stability) with BS-Roformer (for high-end transients) to ensure consistent energy. |
+| **Reverb & Bleed** | Commercial Tools, MDX-Net | **Dry Priority**: Commercial extractors intentionally leave reverb/chorus for naturalness. VDE uses aggressive, cascaded de-reverberation (FoxJoy) to isolate the dry vocal core. |
+| **Silence Artifacts** | Gaudio, Kim Vocal 2 | **Noise Gating**: Mitigates the "silence hallucination" issue where normalization layers amplify the noise floor during empty sections. |
 
 **Best for:** Diff-SVC/RVC dataset preparation, J-Pop/Rock/Ballad genres.
 
@@ -18,26 +25,30 @@ VDE chains multiple models (RoFormer, MDX-Net, De-Reverb) to aggressively isolat
 
 ## Features
 
-- **Multi-model vocal separation** (Mel-RoFormer + BS-RoFormer blend)
-- **De-chorus & De-reverb** (Kara2, De-Echo-Aggressive)
-- **Transient Restore** (consonant attacks recovered from pre-Kara source)
-- **Harmonic Exciter** (DSP-based high freq enhancement)
-- **Mono normalization** (48kHz, -2dB peak, 32-bit float)
-- **CUDA 12 acceleration** for ONNX models
+- **Multi-Model Chaining**: Hybrid architecture blending Mel-RoFormer (Lows) and BS-RoFormer (Highs).
+- **Aggressive Cleaning**: Dedicated De-chorus (Kara2) and De-reverb (FoxJoy) stages.
+- **Transient Restoration**: Preserves consonant attacks often lost during aggressive de-reverberation.
+- **Harmonic Exciter**: DSP-based high-frequency enhancement (mathematically derived air, not random noise).
+- **Training-Ready Output**: Mono normalization (48kHz, -2dB peak, 32-bit float).
+- **Hardware Acceleration**: Dedicated CUDA 12 environment support for ONNX models.
 
 ---
 
-## Default Pipeline
+## Default Pipeline Architecture
+
+The pipeline uses a "Frankenstein" crossover approach to maximize stability and clarity:
 
 ```
-1. HPF 100Hz
-2. Vocal: Mel low + BS mid/high (1kHz-3kHz gradual crossover)
-3. Cleanup: (skipped)
-4. De-Chorus: Kara2                    → vocal/
-5. De-Reverb: Aggressive
-6. Transient Restore
-7. Harmonic Exciter                    → dry_vocal/
-8. Mono & Normalize                    → mono_vocal/
+1. Pre-Process:      HPF 100Hz (Remove rumble)
+2. Hybrid Separation:
+   |-- Lows (<10kHz): Mel-Band RoFormer (Stability focus)
+   |-- Highs (>10kHz): BS-Roformer (Transient/Air focus)
+       -> (Crossover: 1kHz-3kHz gradual blend)
+3. De-Chorus:        Kara2
+4. De-Reverb:        FoxJoy / Aggressive MDX
+5. Post-Process:     Transient Restoration
+6. Enhancement:      Harmonic Exciter (DSP-based)
+7. Finalize:         Mono Mix -> Normalize -2dB -> 48kHz
 ```
 
 ---
@@ -46,25 +57,27 @@ VDE chains multiple models (RoFormer, MDX-Net, De-Reverb) to aggressively isolat
 
 ```
 output_dataset/<singer>/
-├── vocal/          Vocal_<song>.wav         (Step 4: dechorus)
-├── dry_vocal/      dry vocal_<song>.wav     (Step 7: excited)
-├── mono_vocal/     mono vocal_<song>.wav    (Step 8: mono normalized)
-└── temp/           (intermediate files)
+|-- vocal/             Vocal_<song>.wav      (Step 3: Clean, Stereo, Natural Reverb)
+|-- dry_vocal/         dry_vocal_<song>.wav  (Step 6: De-reverbed, Excited)
+|-- mono_vocal/        mono_vocal_<song>.wav (Step 7: Final Training Data)
+|-- temp/              (Intermediate stems)
 ```
 
 ---
 
 ## Requirements
 
-- **Anaconda/Miniconda** (conda in PATH)
-- **NVIDIA GPU** with CUDA support
-- **FFmpeg** installed and in PATH
+- Anaconda/Miniconda (conda in PATH)
+- NVIDIA GPU with CUDA support
+- FFmpeg installed and in PATH
 
 ---
 
 ## Quick Start
 
 ### 1. Setup Main Environment
+
+Handles logic and PyTorch-based models.
 
 ```bash
 conda create -n vde_env python=3.10 -y
@@ -75,33 +88,43 @@ pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118
 
 ### 2. Setup CUDA 12 Environment
 
+Handles ONNX Runtime acceleration.
+
 ```bash
+# Run the provided setup script
 setup_cuda12_env.bat
 ```
 
 ### 3. Download Models
 
-Place in `models/` directory:
+Place the following in the `models/` directory:
+
 - `model_mel_band_roformer_ep_3005_sdr_11.4360.ckpt`
 - `model_bs_roformer_ep_317_sdr_12.9755.ckpt`
-- `Kim_Vocal_2.onnx`
+- `Kim_Vocal_2.onnx` (or `BS-Roformer-ViperX-1296.onnx`)
 - `UVR_MDXNET_KARA_2.onnx`
+- `Reverb_HQ_By_FoxJoy.onnx`
 - `UVR-De-Echo-Aggressive.pth`
 
 ### 4. Run Pipeline
 
 ```bash
-# Add YouTube URLs to urls.txt, then:
-python cleansing.py <singer_name>        # Download + process
-python cleansing.py <singer_name> d      # Default pipeline (skip download)
-python cleansing.py <singer_name> n      # Manual mode
+# Option A: Download from YouTube list and process
+python cleansing.py <singer_name>
+
+# Option B: Process local files (skip download)
+python cleansing.py <singer_name> d
+
+# Option C: Manual Mode (Interactive step selection)
+python cleansing.py <singer_name> n
 ```
 
 ---
 
 ## Configuration
 
-In `process_lib.py`:
+In `process_lib.py`, you can toggle the secondary environment usage:
+
 ```python
 CUDA12_ENV_NAME = "cuda12_env"
 USE_CUDA12_FOR_ONNX = True
@@ -111,6 +134,22 @@ USE_CUDA12_FOR_ONNX = True
 
 ## Troubleshooting
 
-**ONNX models running on CPU:**
-1. Run `setup_cuda12_env.bat`
-2. Verify: `conda activate cuda12_env && python -c "import torch; print(torch.cuda.is_available())"`
+**Issue: ONNX models running on CPU**
+
+1. Ensure `setup_cuda12_env.bat` completed successfully.
+2. Verify CUDA visibility in the sub-environment:
+
+```bash
+conda activate cuda12_env
+python -c "import torch; print(torch.cuda.is_available())"
+```
+
+---
+
+## License
+
+This project is licensed under the MIT License.
+
+You are free to use, modify, and distribute this software for personal or commercial purposes (e.g., training commercial voice models), provided that the original copyright notice is included.
+
+**Note:** This software uses third-party models (UVR, RoFormer) which may have their own licenses. Please respect the licenses of the model weights you download.
