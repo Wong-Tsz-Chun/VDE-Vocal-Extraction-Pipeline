@@ -10,7 +10,6 @@ VDE is a specialized Python audio processing pipeline designed to prepare "dry" 
 
 [![VDE Demo Comparison](https://img.youtube.com/vi/7ayRvN_Pxzc/0.jpg)](https://www.youtube.com/watch?v=7ayRvN_Pxzc)
 
-*Click above to watch the spectrogram analysis and comparison.*
 
 ## The Engineering Gap
 
