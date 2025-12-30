@@ -1,0 +1,63 @@
+# VDE Pre-processing Gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.eggs/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output directories (generated data)
+output_dataset/
+downloads/
+debug_output/
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+
+# Audio files in root (keep models/)
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.m4a
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# Windows
+Thumbs.db
+Desktop.ini
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Models are large - exclude from git (download separately)
+models/*.ckpt
+models/*.onnx
+models/*.pth
+models/*.yaml
+models/*.json
+
+# AB test results (generated)
+ab_test_results/
