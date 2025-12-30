@@ -2,7 +2,7 @@
 
 **Source-Fidelity Vocal Extraction Pipeline for DiffSVC/RVC Training**
 
-VDE is a specialized Python audio processing pipeline designed to prepare "dry" and "clean" vocal datasets for AI voice model training.
+This is a specialized Python audio processing pipeline designed to prepare "dry" and "clean" vocal datasets for AI voice model training.
 
 ---
 
